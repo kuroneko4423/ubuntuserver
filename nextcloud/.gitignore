@@ -1,0 +1,108 @@
+# 機密情報を含む設定ファイル
+.env
+*.env
+.env.local
+.env.production
+
+# ログファイル
+*.log
+logs/
+/var/log/
+
+# バックアップファイル
+*.backup
+*.bak
+*.sql
+*.tar.gz
+*.zip
+backups/
+
+# 一時ファイル
+*.tmp
+*.temp
+/tmp/
+.cache/
+
+# システムファイル
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# エディタ設定
+.vscode/
+.idea/
+*.sublime-*
+
+# SSL証明書（秘密鍵）
+*.key
+*.pem
+*.crt
+*.csr
+private/
+ssl/
+
+# データベースダンプ
+*.sql
+*.db
+*.sqlite
+*.sqlite3
+
+# 設定ファイルのバックアップ
+*.conf.backup
+*.ini.backup
+*.cfg.backup
+
+# 実行時に生成されるファイル
+pid/
+*.pid
+*.sock
+
+# アーカイブファイル
+*.tar
+*.tar.gz
+*.tar.bz2
+*.tgz
+*.zip
+*.rar
+*.7z
+
+# パッケージファイル
+*.deb
+*.rpm
+
+# コンパイル済みファイル
+*.o
+*.so
+*.dylib
+*.dll
+
+# 開発用ファイル
+.vagrant/
+Vagrantfile.local
+docker-compose.override.yml
+
+# テスト関連
+test-results/
+coverage/
+.nyc_output/
+
+# Node.js関連（もし使用する場合）
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python関連（もし使用する場合）
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# 個人設定ファイル
+.personal
+.local
+personal/
