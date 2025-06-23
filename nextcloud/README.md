@@ -1,0 +1,256 @@
+# Nextcloud インストールスクリプト
+
+このディレクトリには、Ubuntu ServerにNextcloudをインストールするためのスクリプトが含まれています。
+
+## ファイル構成
+
+- [`install_nextcloud.sh`](install_nextcloud.sh) - Nextcloudのインストールスクリプト
+
+## 機能
+
+- Nextcloud最新安定版の自動インストール
+- Apache Webサーバーの設定
+- MariaDBデータベースの設定
+- SSL証明書の自動取得（Let's Encrypt）
+- 必要なPHP拡張モジュールのインストール
+- Apache仮想ホストの自動設定
+- ファイアウォールの設定
+
+## 使用方法
+
+### 前提条件
+
+- Ubuntu 20.04 LTS または 22.04 LTS
+- root権限でのアクセス
+- インターネット接続
+- ドメイン名の設定（DNSレコードが正しく設定されていること）
+- 最低2GB以上のRAM推奨
+
+### インストール手順
+
+1. スクリプトを実行可能にする：
+   ```bash
+   chmod +x install_nextcloud.sh
+   ```
+
+2. スクリプト内の変数を編集：
+   ```bash
+   nano install_nextcloud.sh
+   ```
+   - `NEXTCLOUD_VERSION`: 必要に応じてバージョンを変更
+   - `DOMAIN`: 実際のドメイン名に変更
+   - `LETSENCRYPT_EMAIL`: Let's Encrypt登録用のメールアドレスに変更
+
+3. スクリプトを実行：
+   ```bash
+   sudo ./install_nextcloud.sh
+   ```
+
+### インストール後の設定
+
+1. ブラウザで `https://your-domain.com` にアクセス
+2. Nextcloudの初期設定画面で以下を入力：
+   - 管理者ユーザー名とパスワード
+   - データベース設定（MariaDB）
+   - データベース名、ユーザー名、パスワード
+
+## Apache仮想ホスト設定
+
+スクリプトは自動的に以下の仮想ホスト設定を作成します：
+
+```apache
+<VirtualHost *:80>
+    ServerName your-domain.com
+    ServerAlias *
+    DocumentRoot /var/www/html/nextcloud
+
+    # 外部接続のための設定
+    Header set Access-Control-Allow-Origin "*"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    <Directory /var/www/html/nextcloud>
+        Require all granted
+        AllowOverride All
+        Options FollowSymLinks MultiViews
+
+        # クロスオリジン設定
+        Header set Access-Control-Allow-Origin "*"
+        Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+        Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept"
+
+        <IfModule mod_dav.c>
+            Dav off
+        </IfModule>
+    </Directory>
+
+    # ログ設定
+    ErrorLog ${APACHE_LOG_DIR}/nextcloud_error.log
+    CustomLog ${APACHE_LOG_DIR}/nextcloud_access.log combined
+</VirtualHost>
+```
+
+### 設定の詳細
+
+- **外部接続設定**: CORS（Cross-Origin Resource Sharing）ヘッダーとセキュリティヘッダーを設定
+- **クロスオリジン設定**: 異なるドメインからのアクセスを許可
+- **セキュリティヘッダー**: HSTS（HTTP Strict Transport Security）を設定
+
+SSL証明書取得後、自動的にHTTPS設定も追加されます。
+
+## セキュリティ設定
+
+### 推奨設定
+
+1. **強力なパスワードの使用**
+   - 管理者アカウントには複雑なパスワードを設定
+
+2. **ファイアウォールの設定**
+   - 必要なポートのみを開放（80, 443）
+
+3. **定期的なアップデート**
+   ```bash
+   sudo apt update && sudo apt upgrade
+   ```
+
+4. **バックアップの設定**
+   - データディレクトリの定期バックアップ
+   - データベースのバックアップ
+
+### データベースセキュリティ
+
+MariaDBの初期設定時に以下を実行：
+- rootパスワードの設定
+- 匿名ユーザーの削除
+- リモートrootログインの無効化
+- テストデータベースの削除
+
+## トラブルシューティング
+
+### よくある問題
+
+1. **SSL証明書の取得に失敗する場合**
+   - ドメインのDNSレコードが正しく設定されているか確認
+   - ファイアウォールでポート80, 443が開いているか確認
+
+2. **データベース接続エラー**
+   - MariaDBサービスの状態確認: `sudo systemctl status mariadb`
+   - データベース認証情報の確認
+
+3. **ファイルアップロードの問題**
+   - PHP設定の確認: `/etc/php/*/apache2/php.ini`
+   - `upload_max_filesize` と `post_max_size` の値を調整
+
+4. **権限エラー**
+   ```bash
+   sudo chown -R www-data:www-data /var/www/html/nextcloud
+   sudo chmod -R 755 /var/www/html/nextcloud
+   ```
+
+### ログの確認
+
+- Apache エラーログ: `/var/log/apache2/nextcloud_error.log`
+- Apache アクセスログ: `/var/log/apache2/nextcloud_access.log`
+- Nextcloud ログ: `/var/www/html/nextcloud/data/nextcloud.log`
+
+## パフォーマンス最適化
+
+### 推奨設定
+
+1. **PHP OPcache の有効化**
+   ```bash
+   sudo nano /etc/php/*/apache2/php.ini
+   ```
+   ```ini
+   opcache.enable=1
+   opcache.memory_consumption=128
+   opcache.max_accelerated_files=10000
+   opcache.revalidate_freq=1
+   ```
+
+2. **APCu の設定**
+   ```bash
+   sudo apt install php-apcu
+   ```
+
+3. **データベースの最適化**
+   ```bash
+   sudo mysql_secure_installation
+   ```
+
+4. **定期的なメンテナンスタスクの実行**
+   ```bash
+   # crontabに追加
+   sudo crontab -e
+   
+   # 毎日午前3時にメンテナンス実行
+   0 3 * * * sudo -u www-data php /var/www/html/nextcloud/cron.php
+   ```
+
+### ファイルサイズ制限の調整
+
+```bash
+sudo nano /etc/php/*/apache2/php.ini
+```
+
+```ini
+upload_max_filesize = 2G
+post_max_size = 2G
+max_execution_time = 300
+max_input_time = 300
+memory_limit = 512M
+```
+
+設定変更後はApacheを再起動：
+```bash
+sudo systemctl restart apache2
+```
+
+## バックアップとリストア
+
+### データのバックアップ
+
+```bash
+# データディレクトリのバックアップ
+sudo tar -czf nextcloud_data_$(date +%Y%m%d).tar.gz /var/www/html/nextcloud/data
+
+# データベースのバックアップ
+sudo mysqldump -u root -p nextcloud > nextcloud_db_$(date +%Y%m%d).sql
+
+# 設定ファイルのバックアップ
+sudo cp /var/www/html/nextcloud/config/config.php nextcloud_config_$(date +%Y%m%d).php
+```
+
+### 自動バックアップの設定
+
+```bash
+# バックアップスクリプトの作成
+sudo nano /usr/local/bin/nextcloud_backup.sh
+```
+
+```bash
+#!/bin/bash
+BACKUP_DIR="/backup/nextcloud"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p $BACKUP_DIR
+
+# データベースバックアップ
+mysqldump -u root -p[PASSWORD] nextcloud > $BACKUP_DIR/nextcloud_db_$DATE.sql
+
+# データディレクトリバックアップ
+tar -czf $BACKUP_DIR/nextcloud_data_$DATE.tar.gz /var/www/html/nextcloud/data
+
+# 古いバックアップの削除（7日以上前）
+find $BACKUP_DIR -name "nextcloud_*" -mtime +7 -delete
+```
+
+```bash
+# 実行権限付与
+sudo chmod +x /usr/local/bin/nextcloud_backup.sh
+
+# crontabに追加（毎日午前2時実行）
+sudo crontab -e
+0 2 * * * /usr/local/bin/nextcloud_backup.sh
+```
+
+詳細な設定については、[Nextcloud公式ドキュメント](https://docs.nextcloud.com/)を参照してください。
