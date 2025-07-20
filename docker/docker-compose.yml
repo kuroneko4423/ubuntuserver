@@ -1,0 +1,168 @@
+version: '3.8'
+
+services:
+  # Traefik - リバースプロキシとSSL/TLS証明書管理
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/traefik.yml:ro
+      - ./traefik/acme.json:/acme.json
+      - ./traefik/config.yml:/config.yml:ro
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=http"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_USER}:${TRAEFIK_PASSWORD_HASH}"
+      - "traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.traefik.middlewares=traefik-https-redirect"
+      - "traefik.http.routers.traefik-secure.entrypoints=https"
+      - "traefik.http.routers.traefik-secure.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik-secure.middlewares=traefik-auth"
+      - "traefik.http.routers.traefik-secure.tls=true"
+      - "traefik.http.routers.traefik-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-secure.service=api@internal"
+
+  # MariaDB - Nextcloud用データベース
+  nextcloud_db:
+    image: mariadb:10.11
+    container_name: nextcloud_db
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    volumes:
+      - nextcloud_db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${NEXTCLOUD_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+    networks:
+      - nextcloud
+
+  # Redis - Nextcloudキャッシュ
+  nextcloud_redis:
+    image: redis:7-alpine
+    container_name: nextcloud_redis
+    restart: unless-stopped
+    networks:
+      - nextcloud
+
+  # Nextcloud
+  nextcloud:
+    image: nextcloud:28
+    container_name: nextcloud
+    restart: unless-stopped
+    depends_on:
+      - nextcloud_db
+      - nextcloud_redis
+    volumes:
+      - nextcloud_data:/var/www/html
+      - ./nextcloud/config:/var/www/html/config
+      - ./nextcloud/custom_apps:/var/www/html/custom_apps
+      - ./nextcloud/data:/var/www/html/data
+      - ./nextcloud/themes:/var/www/html/themes
+    environment:
+      - MYSQL_HOST=nextcloud_db
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+      - REDIS_HOST=nextcloud_redis
+      - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
+      - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
+      - NEXTCLOUD_TRUSTED_DOMAINS=nextcloud.${DOMAIN}
+      - OVERWRITEPROTOCOL=https
+      - OVERWRITEHOST=nextcloud.${DOMAIN}
+    networks:
+      - proxy
+      - nextcloud
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nextcloud.entrypoints=http"
+      - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.${DOMAIN}`)"
+      - "traefik.http.middlewares.nextcloud-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.nextcloud.middlewares=nextcloud-https-redirect"
+      - "traefik.http.routers.nextcloud-secure.entrypoints=https"
+      - "traefik.http.routers.nextcloud-secure.rule=Host(`nextcloud.${DOMAIN}`)"
+      - "traefik.http.routers.nextcloud-secure.tls=true"
+      - "traefik.http.routers.nextcloud-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nextcloud-secure.middlewares=nextcloud-dav,hsts"
+      - "traefik.http.middlewares.nextcloud-dav.replacepathregex.regex=^/.well-known/ca(l|rd)dav"
+      - "traefik.http.middlewares.nextcloud-dav.replacepathregex.replacement=/remote.php/dav/"
+      - "traefik.http.middlewares.hsts.headers.stsSeconds=15552000"
+      - "traefik.http.middlewares.hsts.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.hsts.headers.stsPreload=true"
+      - "traefik.docker.network=proxy"
+
+  # PostgreSQL - Redmine用データベース
+  redmine_db:
+    image: postgres:15-alpine
+    container_name: redmine_db
+    restart: unless-stopped
+    volumes:
+      - redmine_db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=redmine
+      - POSTGRES_USER=redmine
+      - POSTGRES_PASSWORD=${REDMINE_DB_PASSWORD}
+    networks:
+      - redmine
+
+  # Redmine
+  redmine:
+    image: redmine:5.1
+    container_name: redmine
+    restart: unless-stopped
+    depends_on:
+      - redmine_db
+    volumes:
+      - redmine_files:/usr/src/redmine/files
+      - redmine_plugins:/usr/src/redmine/plugins
+      - redmine_themes:/usr/src/redmine/public/themes
+    environment:
+      - REDMINE_DB_POSTGRES=redmine_db
+      - REDMINE_DB_DATABASE=redmine
+      - REDMINE_DB_USERNAME=redmine
+      - REDMINE_DB_PASSWORD=${REDMINE_DB_PASSWORD}
+      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
+    networks:
+      - proxy
+      - redmine
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.redmine.entrypoints=http"
+      - "traefik.http.routers.redmine.rule=Host(`redmine.${DOMAIN}`)"
+      - "traefik.http.middlewares.redmine-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.redmine.middlewares=redmine-https-redirect"
+      - "traefik.http.routers.redmine-secure.entrypoints=https"
+      - "traefik.http.routers.redmine-secure.rule=Host(`redmine.${DOMAIN}`)"
+      - "traefik.http.routers.redmine-secure.tls=true"
+      - "traefik.http.routers.redmine-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.redmine-secure.middlewares=hsts"
+      - "traefik.docker.network=proxy"
+
+networks:
+  proxy:
+    external: true
+  nextcloud:
+    internal: true
+  redmine:
+    internal: true
+
+volumes:
+  nextcloud_db:
+  nextcloud_data:
+  redmine_db:
+  redmine_files:
+  redmine_plugins:
+  redmine_themes:
