@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  redmine-db:
+    image: mysql:8.0
+    container_name: redmine-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - redmine_db:/var/lib/mysql
+    networks:
+      - redmine-network
+
+  redmine:
+    image: redmine:latest
+    container_name: redmine
+    restart: unless-stopped
+    ports:
+      - "${REDMINE_PORT}:3000"
+    environment:
+      REDMINE_DB_MYSQL: redmine-db
+      REDMINE_DB_DATABASE: ${MYSQL_DATABASE}
+      REDMINE_DB_USERNAME: ${MYSQL_USER}
+      REDMINE_DB_PASSWORD: ${MYSQL_PASSWORD}
+      REDMINE_SECRET_KEY_BASE: ${REDMINE_SECRET_KEY_BASE}
+    volumes:
+      - redmine_data:/usr/src/redmine/files
+      - redmine_plugins:/usr/src/redmine/plugins
+      - redmine_themes:/usr/src/redmine/public/themes
+    depends_on:
+      - redmine-db
+    networks:
+      - redmine-network
+
+volumes:
+  redmine_db:
+  redmine_data:
+  redmine_plugins:
+  redmine_themes:
+
+networks:
+  redmine-network:
+    driver: bridge
