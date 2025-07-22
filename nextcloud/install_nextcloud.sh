@@ -7,43 +7,73 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # 変数設定
-NEXTCLOUD_VERSION="27.1.3"  # 最新の安定版バージョン
+NEXTCLOUD_VERSION="29.0.7"  # 最新の安定版バージョン（PHP 8.3対応）
 DOMAIN="nextcloud.example.com"  # 実際のドメイン名に置き換えてください
 LETSENCRYPT_EMAIL="your-email@example.com"   # Let's Encrypt登録用メールアドレスに置き換えてください
+PHP_VERSION="8.2"  # Nextcloudと互換性のあるPHPバージョン
+DB_NAME="nextcloud"
+DB_USER="nextcloud"
+DB_PASSWORD="pnextcloud4423"
 
 # システムの更新
 echo "システムを更新しています..."
 apt update && apt upgrade -y
 
+# PHP PPAリポジトリの追加（特定のPHPバージョンを指定するため）
+echo "PHP PPAリポジトリを追加しています..."
+apt install -y software-properties-common
+add-apt-repository -y ppa:ondrej/php
+apt update
+
 # 必要な依存関係のインストール
 echo "必要な依存関係をインストールしています..."
 apt install -y \
     apache2 \
-    libapache2-mod-php \
-    php \
-    php-gd \
-    php-mysql \
-    php-curl \
-    php-mbstring \
-    php-intl \
-    php-xml \
-    php-zip \
-    php-bz2 \
-    php-ldap \
-    php-smbclient \
-    php-imap \
-    php-bcmath \
+    libapache2-mod-php${PHP_VERSION} \
+    php${PHP_VERSION} \
+    php${PHP_VERSION}-gd \
+    php${PHP_VERSION}-mysql \
+    php${PHP_VERSION}-curl \
+    php${PHP_VERSION}-mbstring \
+    php${PHP_VERSION}-intl \
+    php${PHP_VERSION}-xml \
+    php${PHP_VERSION}-zip \
+    php${PHP_VERSION}-bz2 \
+    php${PHP_VERSION}-ldap \
+    php${PHP_VERSION}-smbclient \
+    php${PHP_VERSION}-imap \
+    php${PHP_VERSION}-bcmath \
+    php${PHP_VERSION}-imagick \
+    php${PHP_VERSION}-gmp \
     mariadb-server \
     mariadb-client \
-    php-mysql \
     unzip \
     wget \
     certbot \
     python3-certbot-apache
 
+# デフォルトのPHPバージョンを設定
+update-alternatives --set php /usr/bin/php${PHP_VERSION}
+
 # MariaDBの初期設定
 echo "MariaDBを設定しています..."
-mysql_secure_installation
+systemctl start mariadb
+systemctl enable mariadb
+
+# MariaDBのセキュリティ設定とNextcloud用データベースの作成
+mysql -e "UPDATE mysql.user SET Password=PASSWORD('root_password') WHERE User='root';"
+mysql -e "DELETE FROM mysql.user WHERE User='';"
+mysql -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
+mysql -e "DROP DATABASE IF EXISTS test;"
+mysql -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
+mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
+mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';"
+mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
+mysql -e "FLUSH PRIVILEGES;"
+
+echo "データベース設定が完了しました。"
+echo "データベース名: ${DB_NAME}"
+echo "ユーザー名: ${DB_USER}"
 
 # Nextcloudのダウンロードとインストール
 echo "Nextcloudをダウンロードしています..."
@@ -104,5 +134,17 @@ ufw allow 'Apache Full'
 ufw enable
 
 # 最終メッセージ
+echo "========================================"
 echo "Nextcloudのインストールが完了しました。"
-echo "https://${DOMAIN} にアクセスしてNextcloudの初期設定を行ってください。"
+echo "========================================"
+echo ""
+echo "アクセスURL: https://${DOMAIN}"
+echo ""
+echo "初期設定時に以下のデータベース情報を使用してください："
+echo "  データベースタイプ: MariaDB"
+echo "  データベース名: ${DB_NAME}"
+echo "  データベースユーザー: ${DB_USER}"
+echo "  データベースパスワード: ${DB_PASSWORD}"
+echo "  データベースホスト: localhost"
+echo ""
+echo "管理者アカウントは初回アクセス時に作成してください。"

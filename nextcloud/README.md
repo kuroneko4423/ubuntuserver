@@ -1,14 +1,22 @@
 # Nextcloud インストールスクリプト
 
-このディレクトリには、Ubuntu ServerにNextcloudをインストールするためのスクリプトが含まれています。
+このディレクトリには、Ubuntu ServerにNextcloudをインストールするためのスクリプトとDocker Compose構成が含まれています。
 
 ## ファイル構成
 
+### 通常インストール用
 - [`install_nextcloud.sh`](install_nextcloud.sh) - Nextcloudのインストールスクリプト
+
+### Docker Compose用
+- `docker-compose.yml` - Docker Compose構成ファイル
+- `.env.example` - 環境変数のテンプレート
+- `nginx.conf` - Nginx設定ファイル
+- `.gitignore` - Git除外設定
 
 ## 機能
 
-- Nextcloud最新安定版の自動インストール
+- Nextcloud 29.0.7（最新安定版）の自動インストール
+- PHP 8.2/8.3対応
 - Apache Webサーバーの設定
 - MariaDBデータベースの設定
 - SSL証明書の自動取得（Let's Encrypt）
@@ -18,7 +26,11 @@
 
 ## 使用方法
 
-### 前提条件
+## インストール方法
+
+### 方法1: 通常インストール（install_nextcloud.sh使用）
+
+#### 前提条件
 
 - Ubuntu 20.04 LTS または 22.04 LTS
 - root権限でのアクセス
@@ -26,7 +38,7 @@
 - ドメイン名の設定（DNSレコードが正しく設定されていること）
 - 最低2GB以上のRAM推奨
 
-### インストール手順
+#### インストール手順
 
 1. スクリプトを実行可能にする：
    ```bash
@@ -37,22 +49,30 @@
    ```bash
    nano install_nextcloud.sh
    ```
-   - `NEXTCLOUD_VERSION`: 必要に応じてバージョンを変更
+   - `NEXTCLOUD_VERSION`: 29.0.7（PHP 8.3対応版）
+   - `PHP_VERSION`: 8.2（推奨）
    - `DOMAIN`: 実際のドメイン名に変更
    - `LETSENCRYPT_EMAIL`: Let's Encrypt登録用のメールアドレスに変更
+   - `DB_NAME`: nextcloud（データベース名）
+   - `DB_USER`: nextcloud（データベースユーザー名）
+   - `DB_PASSWORD`: pnextcloud4423（データベースパスワード）
 
 3. スクリプトを実行：
    ```bash
    sudo ./install_nextcloud.sh
    ```
 
-### インストール後の設定
+#### インストール後の設定
 
 1. ブラウザで `https://your-domain.com` にアクセス
 2. Nextcloudの初期設定画面で以下を入力：
-   - 管理者ユーザー名とパスワード
-   - データベース設定（MariaDB）
-   - データベース名、ユーザー名、パスワード
+   - 管理者ユーザー名とパスワード（任意に設定）
+   - データベース設定：
+     - データベースタイプ: MariaDB
+     - データベース名: nextcloud
+     - データベースユーザー: nextcloud
+     - データベースパスワード: pnextcloud4423
+     - データベースホスト: localhost
 
 ## Apache仮想ホスト設定
 
@@ -118,11 +138,15 @@ SSL証明書取得後、自動的にHTTPS設定も追加されます。
 
 ### データベースセキュリティ
 
-MariaDBの初期設定時に以下を実行：
+スクリプトは自動的に以下のセキュリティ設定を実行します：
 - rootパスワードの設定
 - 匿名ユーザーの削除
 - リモートrootログインの無効化
 - テストデータベースの削除
+- Nextcloud専用データベースとユーザーの作成：
+  - データベース名: nextcloud
+  - ユーザー名: nextcloud
+  - パスワード: pnextcloud4423
 
 ## トラブルシューティング
 
@@ -134,7 +158,11 @@ MariaDBの初期設定時に以下を実行：
 
 2. **データベース接続エラー**
    - MariaDBサービスの状態確認: `sudo systemctl status mariadb`
-   - データベース認証情報の確認
+   - データベース認証情報の確認：
+     - データベース名: nextcloud
+     - ユーザー名: nextcloud
+     - パスワード: pnextcloud4423
+     - ホスト: localhost
 
 3. **ファイルアップロードの問題**
    - PHP設定の確認: `/etc/php/*/apache2/php.ini`
@@ -214,7 +242,7 @@ sudo systemctl restart apache2
 sudo tar -czf nextcloud_data_$(date +%Y%m%d).tar.gz /var/www/html/nextcloud/data
 
 # データベースのバックアップ
-sudo mysqldump -u root -p nextcloud > nextcloud_db_$(date +%Y%m%d).sql
+sudo mysqldump -u nextcloud -ppnextcloud4423 nextcloud > nextcloud_db_$(date +%Y%m%d).sql
 
 # 設定ファイルのバックアップ
 sudo cp /var/www/html/nextcloud/config/config.php nextcloud_config_$(date +%Y%m%d).php
@@ -235,7 +263,7 @@ DATE=$(date +%Y%m%d_%H%M%S)
 mkdir -p $BACKUP_DIR
 
 # データベースバックアップ
-mysqldump -u root -p[PASSWORD] nextcloud > $BACKUP_DIR/nextcloud_db_$DATE.sql
+mysqldump -u nextcloud -ppnextcloud4423 nextcloud > $BACKUP_DIR/nextcloud_db_$DATE.sql
 
 # データディレクトリバックアップ
 tar -czf $BACKUP_DIR/nextcloud_data_$DATE.tar.gz /var/www/html/nextcloud/data
@@ -252,5 +280,135 @@ sudo chmod +x /usr/local/bin/nextcloud_backup.sh
 sudo crontab -e
 0 2 * * * /usr/local/bin/nextcloud_backup.sh
 ```
+
+### 方法2: Docker Composeを使用したインストール
+
+#### 前提条件
+
+- Docker および Docker Compose がインストール済み
+- ドメイン名の設定（SSL証明書取得用）
+- 最低2GB以上のRAM推奨
+
+#### インストール手順
+
+1. 環境変数ファイルを作成：
+   ```bash
+   cp .env.example .env
+   ```
+
+2. `.env`ファイルを編集して設定を変更：
+   ```bash
+   nano .env
+   ```
+   必須項目：
+   - `MYSQL_ROOT_PASSWORD`: データベースのrootパスワード
+   - `MYSQL_PASSWORD`: Nextcloud用データベースパスワード
+   - `NEXTCLOUD_ADMIN_PASSWORD`: Nextcloud管理者パスワード
+   - `NEXTCLOUD_DOMAIN`: 実際のドメイン名
+   - `LETSENCRYPT_EMAIL`: SSL証明書通知用メールアドレス
+
+3. コンテナを起動：
+   ```bash
+   docker-compose up -d
+   ```
+
+4. SSL証明書を取得（初回のみ）：
+   ```bash
+   # ドメイン名とメールアドレスを実際の値に置き換えてください
+   docker-compose exec certbot certbot certonly \
+     --webroot -w /var/www/certbot \
+     -d your-domain.com \
+     --email your-email@example.com \
+     --agree-tos --non-interactive
+   ```
+
+5. Nginxを再起動してSSL設定を適用：
+   ```bash
+   docker-compose restart nginx
+   ```
+
+6. ブラウザで `https://your-domain.com` にアクセス
+
+#### Docker構成の詳細
+
+**含まれるサービス：**
+- **Nextcloud 29.0.7**: メインアプリケーション（PHP 8.3対応）
+- **MariaDB 10.11**: データベースサーバー
+- **Redis**: キャッシュとファイルロック用
+- **Nginx**: リバースプロキシとSSL終端
+- **Certbot**: Let's Encrypt SSL証明書の自動更新
+
+**ボリューム構成：**
+- `./data`: Nextcloudのデータディレクトリ（ローカルマウント）
+- `db_data`: MariaDBデータ（名前付きボリューム）
+- `nextcloud_data`: Nextcloudアプリケーションファイル（名前付きボリューム）
+- `./ssl`: SSL証明書（ローカルマウント）
+
+#### Dockerコマンド集
+
+```bash
+# ログを確認
+docker-compose logs -f
+
+# 特定のサービスのログを確認
+docker-compose logs -f app
+
+# コンテナの状態を確認
+docker-compose ps
+
+# コンテナを停止
+docker-compose stop
+
+# コンテナを停止して削除
+docker-compose down
+
+# データも含めて完全に削除
+docker-compose down -v
+
+# Nextcloudのocc コマンドを実行
+docker-compose exec --user www-data app php occ [コマンド]
+
+# 例：ファイルスキャンを実行
+docker-compose exec --user www-data app php occ files:scan --all
+```
+
+#### トラブルシューティング（Docker版）
+
+1. **コンテナが起動しない場合**
+   ```bash
+   docker-compose logs [サービス名]
+   ```
+   でエラーログを確認
+
+2. **権限エラーが発生する場合**
+   ```bash
+   # データディレクトリの権限を修正
+   docker-compose exec app chown -R www-data:www-data /var/www/html
+   ```
+
+3. **SSL証明書エラー**
+   - ドメインのDNS設定を確認
+   - ポート80,443が開いていることを確認
+   - 初回は証明書取得前にHTTPでアクセス可能か確認
+
+4. **データベース接続エラー**
+   ```bash
+   # データベースコンテナの状態を確認
+   docker-compose exec db mysql -u nextcloud -ppnextcloud4423 -e "SHOW DATABASES;"
+   ```
+
+## PHP互換性について
+
+### Nextcloud バージョンとPHP互換性
+
+| Nextcloud | PHP 8.0 | PHP 8.1 | PHP 8.2 | PHP 8.3 |
+|-----------|---------|---------|---------|----------|
+| 27.x      | ✓       | ✓       | ✓       | ✗        |
+| 28.x      | ✓       | ✓       | ✓       | ✓        |
+| 29.x      | ✗       | ✓       | ✓       | ✓        |
+
+**推奨構成：**
+- Nextcloud 29.0.7 + PHP 8.2（最も安定）
+- Nextcloud 29.0.7 + PHP 8.3（最新環境）
 
 詳細な設定については、[Nextcloud公式ドキュメント](https://docs.nextcloud.com/)を参照してください。
