@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Ubuntu用Redmineインストールスクリプト
-# このスクリプトはRedmineをMySQL/MariaDBとApache2でインストールします
+# このスクリプトはRedmineをPostgreSQLとApache2でインストールします
 
 set -e
 
@@ -18,15 +18,15 @@ sudo apt-get upgrade -y
 echo "依存関係をインストールしています..."
 sudo apt-get install -y \
     build-essential \
-    libmysqlclient-dev \
+    libpq-dev \
     imagemagick \
     libmagickwand-dev \
     libxml2-dev \
     libxslt1-dev \
     apache2 \
     libapache2-mod-passenger \
-    mysql-server \
-    mysql-client \
+    postgresql \
+    postgresql-contrib \
     git \
     curl \
     gnupg2 \
@@ -55,12 +55,13 @@ rbenv install $RUBY_VERSION
 rbenv global $RUBY_VERSION
 gem install bundler
 
-# MySQLデータベースのセットアップ
-echo "MySQLデータベースを設定しています..."
-sudo mysql -e "CREATE DATABASE IF NOT EXISTS redmine CHARACTER SET utf8mb4;"
-sudo mysql -e "CREATE USER IF NOT EXISTS 'redmine'@'localhost' IDENTIFIED BY 'redmine_password';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';"
-sudo mysql -e "FLUSH PRIVILEGES;"
+# PostgreSQLデータベースのセットアップ
+echo "PostgreSQLデータベースを設定しています..."
+sudo -u postgres psql << EOF
+CREATE USER redmine WITH PASSWORD 'redmine_password';
+CREATE DATABASE redmine WITH ENCODING='UTF8' OWNER=redmine;
+ALTER USER redmine CREATEDB;
+EOF
 
 # Redmineのダウンロードとインストール
 echo "Redmineをダウンロードしています..."
@@ -76,12 +77,12 @@ git checkout 5.1-stable
 echo "データベースを設定しています..."
 cat > config/database.yml << EOF
 production:
-  adapter: mysql2
+  adapter: postgresql
   database: redmine
   host: localhost
   username: redmine
   password: redmine_password
-  encoding: utf8mb4
+  encoding: utf8
 EOF
 
 # Gemのインストール

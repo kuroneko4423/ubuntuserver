@@ -1,6 +1,6 @@
 # Redmineインストールスクリプト
 
-このディレクトリには、UbuntuにRedmineをインストールし、外部アクセスを設定するシェルスクリプトが含まれています。
+このディレクトリには、UbuntuにRedmineをPostgreSQLデータベースでインストールし、外部アクセスを設定するシェルスクリプトが含まれています。
 
 ## 前提条件
 
@@ -30,9 +30,9 @@
 ## スクリプトの処理内容
 
 1. **システム更新**: すべてのシステムパッケージを更新
-2. **依存関係**: 必要なパッケージ（Ruby、MySQL、Apacheなど）をインストール
+2. **依存関係**: 必要なパッケージ（Ruby、PostgreSQL、Apacheなど）をインストール
 3. **Rubyインストール**: rbenvを使用してRubyをインストール（バージョン管理が容易）
-4. **データベース設定**: Redmine用のMySQLデータベースとユーザーを作成
+4. **データベース設定**: Redmine用のPostgreSQLデータベースとユーザーを作成
 5. **Redmineインストール**: Redmine 5.1（安定版）をダウンロードして設定
 6. **Webサーバー**: ApacheとPassengerモジュールを設定
 7. **ファイアウォール**: Web アクセスに必要なポートを開放
@@ -51,7 +51,7 @@
 ## セキュリティに関する注意事項
 
 1. **データベースパスワード**: スクリプトはデフォルトパスワードを使用しています。本番環境では変更してください:
-   - MySQLでパスワードを更新
+   - PostgreSQLでパスワードを更新
    - `/opt/redmine/config/database.yml` を更新
 
 2. **HTTPS設定**: 本番環境ではHTTPSを有効にしてください:
@@ -79,13 +79,13 @@ sudo tail -f /var/log/apache2/redmine_error.log
 
 ### データベース接続テスト
 ```bash
-mysql -u redmine -p -h localhost redmine
+psql -U redmine -h localhost -d redmine
 ```
 
 ### サービスの再起動
 ```bash
 sudo systemctl restart apache2
-sudo systemctl restart mysql
+sudo systemctl restart postgresql
 ```
 
 ## カスタマイズ
@@ -100,6 +100,6 @@ Redmineをカスタマイズするには：
 ## バックアップ
 
 定期的なバックアップに含めるべき項目：
-- データベース: `mysqldump -u redmine -p redmine > backup.sql`
+- データベース: `pg_dump -U redmine -h localhost redmine > backup.sql`
 - ファイル: `/opt/redmine/files/`
 - 設定: `/opt/redmine/config/`
