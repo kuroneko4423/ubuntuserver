@@ -1,0 +1,32 @@
+services:
+  softether:
+    image: siomiz/softethervpn:latest
+    container_name: softether-vpn
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "500:500/udp"
+      - "4500:4500/udp"
+      - "1701:1701/tcp"
+      - "1194:1194/udp"
+      - "5555:5555/tcp"
+      - "443:443/tcp"
+    environment:
+      - SPW=${SOFTETHER_SERVER_PASSWORD:-serverpassword}
+      - HPW=${SOFTETHER_HUB_PASSWORD:-hubpassword}
+      - PSK=${SOFTETHER_IPSEC_PSK:-presharedkey}
+      - USERNAME=${SOFTETHER_USERNAME:-user1}
+      - PASSWORD=${SOFTETHER_PASSWORD:-userpassword}
+    volumes:
+      - softether-config:/usr/vpnserver
+    restart: unless-stopped
+    networks:
+      - softether-net
+
+volumes:
+  softether-config:
+    driver: local
+
+networks:
+  softether-net:
+    driver: bridge

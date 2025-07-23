@@ -1,0 +1,14 @@
+# 環境変数ファイル
+.env
+
+# SoftEther設定ディレクトリ
+config/
+
+# ログディレクトリ
+logs/
+
+# その他
+*.log
+*.bak
+*.tmp
+.DS_Store
