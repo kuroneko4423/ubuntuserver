@@ -24,7 +24,7 @@ services:
       - nextcloud-network
 
   nextcloud:
-    image: nextcloud:latest
+    build: .
     container_name: nextcloud
     restart: unless-stopped
     ports:
