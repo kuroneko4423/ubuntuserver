@@ -1,0 +1,26 @@
+services:
+  code-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: custom-code-server:latest
+    container_name: code-server
+    restart: unless-stopped
+    environment:
+      - PASSWORD=${PASSWORD:-password}
+      - SUDO_PASSWORD=${SUDO_PASSWORD:-password}
+      - TZ=${TZ:-Asia/Tokyo}
+      - DEFAULT_WORKSPACE=${DEFAULT_WORKSPACE:-/home/coder/project}
+    ports:
+      - ${PORT:-8080}:8080
+    volumes:
+      - ./config:/home/coder/.config
+      - ./project:/home/coder/project
+      - ./extensions:/home/coder/.local/share/code-server/extensions
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - code-server-network
+
+networks:
+  code-server-network:
+    driver: bridge
