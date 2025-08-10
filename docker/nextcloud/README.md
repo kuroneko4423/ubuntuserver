@@ -12,6 +12,7 @@ DockerでNextcloudを実行するための設定です。
 
 - SMB/CIFSドライブへの接続対応（smbclientインストール済み）
 - 外部ストレージアプリでSMB共有をマウント可能
+- HTTPS接続対応（自己署名SSL証明書を自動生成）
 
 ## セットアップ
 
@@ -32,7 +33,9 @@ docker-compose build
 docker-compose up -d
 ```
 
-5. ブラウザで `http://localhost:8080` にアクセス
+5. ブラウザでアクセス:
+   - HTTP: `http://localhost:8080`
+   - HTTPS: `https://localhost:8443` （自己署名証明書のため警告が表示されます）
 
 ## 停止
 
@@ -57,7 +60,17 @@ docker-compose down
 - `NEXTCLOUD_ADMIN_USER`: Nextcloud管理者ユーザー名
 - `NEXTCLOUD_ADMIN_PASSWORD`: Nextcloud管理者パスワード
 - `NEXTCLOUD_TRUSTED_DOMAINS`: 信頼するドメイン
-- `NEXTCLOUD_PORT`: 公開ポート（デフォルト: 8080）
+- `NEXTCLOUD_PORT`: HTTP公開ポート（デフォルト: 8080）
+- `NEXTCLOUD_HTTPS_PORT`: HTTPS公開ポート（デフォルト: 8443）
+
+## SSL証明書について
+
+このセットアップでは自己署名SSL証明書が自動的に生成されます。
+- 証明書の有効期限: 365日
+- 証明書のCN: localhost
+- 保存場所: コンテナ内の `/etc/ssl/nextcloud/`
+
+本番環境では、Let's Encryptなどの正式な証明書の使用を推奨します。
 
 ## SMB/CIFS共有の設定
 
