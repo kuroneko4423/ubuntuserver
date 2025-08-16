@@ -1,0 +1,14 @@
+services:
+  # Since IronFunctions is deprecated, using Fn Project as an alternative
+  fnserver:
+    image: fnproject/fnserver:latest
+    container_name: fnserver
+    ports:
+      - "8000:8080"
+    volumes:
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - FN_LOG_LEVEL=info
+    privileged: true
+    restart: unless-stopped
