@@ -1,0 +1,19 @@
+# 証明書ファイル（Dockerfileで自動生成されるため不要）
+certs/
+*.key
+*.crt
+*.csr
+*.pem
+
+# 環境設定ファイル
+.env
+
+# OS関連
+.DS_Store
+Thumbs.db
+
+# IDEファイル
+.vscode/
+.idea/
+*.swp
+*.swo
