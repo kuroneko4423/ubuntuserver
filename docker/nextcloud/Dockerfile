@@ -9,7 +9,7 @@ RUN apt-get update && \
 
 # SSL証明書の生成
 RUN mkdir -p /etc/ssl/nextcloud && \
-    openssl req -x509 -nodes -days 1000 -newkey rsa:2048 \
+    openssl req -x509 -nodes -days 10000 -newkey rsa:2048 \
     -keyout /etc/ssl/nextcloud/nextcloud.key \
     -out /etc/ssl/nextcloud/nextcloud.crt \
     -subj "/C=JP/ST=Tokyo/L=Tokyo/O=Nextcloud/OU=IT/CN=localhost"
