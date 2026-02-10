@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  gitlab-postgres:
+    image: postgres:16-alpine
+    container_name: gitlab-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${GITLAB_POSTGRES_USER:-gitlab}
+      POSTGRES_PASSWORD: ${GITLAB_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${GITLAB_POSTGRES_DB:-gitlabhq_production}
+    volumes:
+      - gitlab_postgres_data:/var/lib/postgresql/data
+    networks:
+      - gitlab-network
+
+  gitlab-redis:
+    image: redis:7-alpine
+    container_name: gitlab-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${GITLAB_REDIS_PASSWORD}
+    volumes:
+      - gitlab_redis_data:/data
+    networks:
+      - gitlab-network
+
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: gitlab
+    restart: unless-stopped
+    hostname: ${GITLAB_HOSTNAME:-gitlab.example.com}
+    ports:
+      - "${GITLAB_HTTP_PORT:-80}:80"
+      - "${GITLAB_HTTPS_PORT:-443}:443"
+      - "${GITLAB_SSH_PORT:-22}:22"
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url '${GITLAB_EXTERNAL_URL:-http://gitlab.example.com}'
+        gitlab_rails['time_zone'] = '${TZ:-Asia/Tokyo}'
+
+        # Database configuration
+        gitlab_rails['db_adapter'] = 'postgresql'
+        gitlab_rails['db_encoding'] = 'utf8'
+        gitlab_rails['db_host'] = 'gitlab-postgres'
+        gitlab_rails['db_port'] = 5432
+        gitlab_rails['db_database'] = '${GITLAB_POSTGRES_DB:-gitlabhq_production}'
+        gitlab_rails['db_username'] = '${GITLAB_POSTGRES_USER:-gitlab}'
+        gitlab_rails['db_password'] = '${GITLAB_POSTGRES_PASSWORD}'
+
+        # Redis configuration
+        gitlab_rails['redis_host'] = 'gitlab-redis'
+        gitlab_rails['redis_port'] = 6379
+        gitlab_rails['redis_password'] = '${GITLAB_REDIS_PASSWORD}'
+
+        # Email configuration (optional)
+        # gitlab_rails['smtp_enable'] = true
+        # gitlab_rails['smtp_address'] = 'smtp.gmail.com'
+        # gitlab_rails['smtp_port'] = 587
+        # gitlab_rails['smtp_user_name'] = 'your_email@gmail.com'
+        # gitlab_rails['smtp_password'] = 'your_password'
+        # gitlab_rails['smtp_domain'] = 'smtp.gmail.com'
+        # gitlab_rails['smtp_authentication'] = 'login'
+        # gitlab_rails['smtp_enable_starttls_auto'] = true
+        # gitlab_rails['smtp_tls'] = false
+        # gitlab_rails['smtp_openssl_verify_mode'] = 'peer'
+
+        # Disable built-in PostgreSQL and Redis
+        postgresql['enable'] = false
+        redis['enable'] = false
+    volumes:
+      - gitlab_config:/etc/gitlab
+      - gitlab_logs:/var/log/gitlab
+      - gitlab_data:/var/opt/gitlab
+    depends_on:
+      - gitlab-postgres
+      - gitlab-redis
+    networks:
+      - gitlab-network
+    shm_size: '256m'
+
+volumes:
+  gitlab_postgres_data:
+  gitlab_redis_data:
+  gitlab_config:
+  gitlab_logs:
+  gitlab_data:
+
+networks:
+  gitlab-network:
+    driver: bridge
