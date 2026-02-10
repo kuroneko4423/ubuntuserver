@@ -1,0 +1,19 @@
+# Environment files
+.env
+
+# JupyterHub data
+jupyterhub.sqlite
+jupyterhub_cookie_secret
+jupyterhub_data/
+
+# User data volumes
+jupyterhub-user-*
+
+# Logs
+*.log
+
+# SSL certificates
+ssl/
+*.pem
+*.key
+*.crt

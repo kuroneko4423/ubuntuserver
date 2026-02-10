@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  jupyterhub:
+    build: .
+    image: custom-jupyterhub:latest
+    container_name: jupyterhub
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./jupyterhub_config.py:/srv/jupyterhub/jupyterhub_config.py
+      - jupyterhub_data:/srv/jupyterhub
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - JUPYTERHUB_SSL_CERT=/srv/jupyterhub/ssl/cert.pem
+      - JUPYTERHUB_SSL_KEY=/srv/jupyterhub/ssl/key.pem
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}  # Use .env file or default
+    networks:
+      - jupyterhub-network
+
+  notebook:
+    image: jupyter/scipy-notebook:latest
+    container_name: jupyter-notebook
+    networks:
+      - jupyterhub-network
+    command: echo "This is a template container for spawning user notebooks"
+
+volumes:
+  jupyterhub_data:
+    driver: local
+
+networks:
+  jupyterhub-network:
+    driver: bridge
